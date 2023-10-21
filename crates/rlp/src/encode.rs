@@ -171,7 +171,39 @@ macro_rules! uint_impl {
     )+};
 }
 
+macro_rules! int_impl {
+    ($($t:ty),+ $(,)?) => {$(
+        impl Encodable for $t {
+            #[inline]
+            fn length(&self) -> usize {
+                let x = *self;
+                1 + (<$t>::BITS as usize / 8) - (x.leading_zeros() as usize / 8)
+            }
+
+            #[inline]
+            fn encode(&self, out: &mut dyn BufMut) {
+                let x = *self;
+                if x == 0 {
+                } else if x > 0 && x < EMPTY_STRING_CODE as $t {
+                    out.put_u8(x as u8);
+                } else {
+                    let be;
+                    let be = to_be_bytes_trimmed!(be, x);
+                    out.put_u8(EMPTY_STRING_CODE + be.len() as u8);
+                    out.put_slice(be);
+                }
+            }
+        }
+
+        impl_max_encoded_len!($t, {
+            let bytes = <$t>::BITS as usize / 8;
+            bytes + length_of_length(bytes)
+        });
+    )+};
+}
+
 uint_impl!(u8, u16, u32, u64, usize, u128);
+int_impl!(i8, i16, i32, i64, isize, i128);
 
 impl<T: Encodable> Encodable for Vec<T> {
     #[inline]
